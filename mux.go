@@ -252,6 +252,10 @@ func (r *Router) UseMiddlewareHandlerFunc(m func(http.ResponseWriter, *http.Requ
 	r.middleware = append(r.middleware, WrapMiddleware(http.HandlerFunc(m)))
 }
 
+func (r *Router) GetMiddleware() []MiddlewareHandler {
+	return append([]MiddlewareHandler{}, r.middleware...)
+}
+
 // ----------------------------------------------------------------------------
 // Route factories
 // ----------------------------------------------------------------------------
