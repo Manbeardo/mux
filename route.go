@@ -1,4 +1,4 @@
-// Copyright 2012 The Gorilla Authors. All rights reserved.
+// Copyright 2015 The Gorilla Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -390,9 +390,22 @@ func (r *Route) BuildVarsFunc(f BuildVarsFunc) *Route {
 // Here, the routes registered in the subrouter won't be tested if the host
 // doesn't match.
 func (r *Route) Subrouter() *Router {
-	router := &Router{parent: r, strictSlash: r.strictSlash}
-	r.addMatcher(router)
+	router := &Router{}
+	r.attachSubrouter(router)
 	return router
+}
+
+// SubrouterFrom clones a router and attaches it as subrouter. See Route.Subrouter().
+func (r *Route) SubrouterFrom(base *Router) *Router {
+	clone := base.clone()
+	r.attachSubrouter(clone)
+	return clone
+}
+
+func (r *Route) attachSubrouter(router *Router) {
+	router.parent = r
+	router.strictSlash = r.strictSlash
+	r.addMatcher(router)
 }
 
 // ----------------------------------------------------------------------------

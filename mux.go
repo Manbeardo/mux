@@ -1,4 +1,4 @@
-// Copyright 2012 The Gorilla Authors. All rights reserved.
+// Copyright 2015 The Gorilla Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -38,6 +38,8 @@ func NewRouter() *Router {
 type Router struct {
 	// Configurable Handler to be used when no route matches.
 	NotFoundHandler http.Handler
+	// Middleware handlers to be run
+	middleware []MiddlewareHandler
 	// Parent route, if this is a subrouter.
 	parent parentRoute
 	// Routes to be matched, in order.
@@ -48,6 +50,18 @@ type Router struct {
 	strictSlash bool
 	// If true, do not clear the request context after handling the request
 	KeepContext bool
+}
+
+// clone creates a deep-copied clone of a router
+func (r *Router) clone() *Router {
+	clone := *r
+	clone.middleware = append([]MiddlewareHandler{}, r.middleware...)
+	clone.routes = append([]*Route{}, r.routes...)
+	clone.namedRoutes = make(map[string]*Route)
+	for k, v := range r.namedRoutes {
+		clone.namedRoutes[k] = v
+	}
+	return &clone
 }
 
 // Match matches registered routes against the request.
@@ -95,7 +109,8 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if !r.KeepContext {
 		defer context.Clear(req)
 	}
-	handler.ServeHTTP(w, req)
+
+	buildMiddleware(r.middleware, handler).ServeHTTP(w, req)
 }
 
 // Get returns a route registered with the given name.
@@ -157,6 +172,84 @@ func (r *Router) buildVars(m map[string]string) map[string]string {
 		m = r.parent.buildVars(m)
 	}
 	return m
+}
+
+// ----------------------------------------------------------------------------
+// Middleware -- kindly borrowed from negroni
+// ----------------------------------------------------------------------------
+
+// MiddlewareHandler is an interface that objects can implement to be registered to serve as middleware
+// in the mux middleware stack.
+// ServeHTTP should yield to the next middleware in the chain by invoking the next http.HandlerFunc
+// passed in.
+//
+// If the MiddlewareHandler writes to the ResponseWriter, the next http.HandlerFunc should not be invoked.
+type MiddlewareHandler interface {
+	ServeHTTP(http.ResponseWriter, *http.Request, http.HandlerFunc)
+}
+
+// MiddlewareHandlerFunc is an adapter to allow the use of ordinary functions as middleware handlers.
+// If f is a function with the appropriate signature, MiddlewareHandlerFunc(f) is a MiddlewareHandler object that calls f.
+type MiddlewareHandlerFunc func(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc)
+
+func (h MiddlewareHandlerFunc) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
+	h(rw, r, next)
+}
+
+// WrapMiddleware converts a http.Handler into a mux.MiddlewareHandler so it can be used as mux
+// middleware. The next http.HandlerFunc is automatically called after the MiddlewareHandler
+// is executed.
+func WrapMiddleware(handler http.Handler) MiddlewareHandler {
+	return MiddlewareHandlerFunc(func(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
+		handler.ServeHTTP(rw, r)
+		next(rw, r)
+	})
+}
+
+type middleware struct {
+	handler MiddlewareHandler
+	next    *middleware
+}
+
+func (m middleware) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
+	m.handler.ServeHTTP(rw, r, m.next.ServeHTTP)
+}
+
+func buildMiddleware(handlers []MiddlewareHandler, final http.Handler) middleware {
+	var next middleware
+
+	if len(handlers) == 0 {
+		return finalMiddleware(final)
+	} else if len(handlers) > 1 {
+		next = buildMiddleware(handlers[1:], final)
+	} else {
+		next = finalMiddleware(final)
+	}
+
+	return middleware{handlers[0], &next}
+}
+
+func finalMiddleware(final http.Handler) middleware {
+	return middleware{
+		MiddlewareHandlerFunc(func(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) { final.ServeHTTP(rw, r) }),
+		&middleware{},
+	}
+}
+
+func (r *Router) UseMiddleware(m MiddlewareHandler) {
+	r.middleware = append(r.middleware, m)
+}
+
+func (r *Router) UseMiddlewareFunc(m func(http.ResponseWriter, *http.Request, http.HandlerFunc)) {
+	r.middleware = append(r.middleware, MiddlewareHandlerFunc(m))
+}
+
+func (r *Router) UseMiddlewareHandler(m http.Handler) {
+	r.middleware = append(r.middleware, WrapMiddleware(m))
+}
+
+func (r *Router) UseMiddlewareHandlerFunc(m func(http.ResponseWriter, *http.Request)) {
+	r.middleware = append(r.middleware, WrapMiddleware(http.HandlerFunc(m)))
 }
 
 // ----------------------------------------------------------------------------
