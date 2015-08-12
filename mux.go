@@ -38,7 +38,7 @@ func NewRouter() *Router {
 type Router struct {
 	// Configurable Handler to be used when no route matches.
 	NotFoundHandler http.Handler
-	// Middleware handlers to be run
+	// Middleware handlers to be run.
 	middleware []MiddlewareHandler
 	// Parent route, if this is a subrouter.
 	parent parentRoute
@@ -52,7 +52,7 @@ type Router struct {
 	KeepContext bool
 }
 
-// clone creates a deep-copied clone of a router
+// clone creates a deep-copied clone of the router.
 func (r *Router) clone() *Router {
 	clone := *r
 	clone.middleware = append([]MiddlewareHandler{}, r.middleware...)
