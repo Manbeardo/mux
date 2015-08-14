@@ -81,6 +81,10 @@ func (r *Router) Match(req *http.Request, match *RouteMatch) bool {
 // When there is a match, the route variables can be retrieved calling
 // mux.Vars(request).
 func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	if req == nil {
+		panic("nil request")
+	}
+
 	// Clean path to canonical form and redirect.
 	if p := cleanPath(req.URL.Path); p != req.URL.Path {
 
@@ -112,7 +116,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		defer context.Clear(req)
 	}
 
-	buildMiddleware(r.middleware, handler).ServeHTTP(w, req)
+	buildMiddleware(r.middleware, handler).ServeHTTP(NewResponseWriter(w), req)
 }
 
 // Get returns a route registered with the given name.
