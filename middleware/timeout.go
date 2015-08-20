@@ -10,6 +10,11 @@ type Timeout struct {
 	Limit time.Duration
 }
 
+// NewTimeout builds a new timeout middleware
+func NewTimeout(limit time.Duration) *Timeout {
+	return &Timeout{limit}
+}
+
 func (m *Timeout) ServeHTTP(w http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 	doneChan := make(chan bool)
 	go func() {
