@@ -1,13 +1,16 @@
 // lovingly stolen from negroni
 
-package mux
+package middleware
 
 import (
 	"bytes"
+	"github.com/stretchr/testify/assert"
 	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/Manbeardo/mux"
 )
 
 func Test_Logger(t *testing.T) {
@@ -17,7 +20,7 @@ func Test_Logger(t *testing.T) {
 	l := NewLogger()
 	l.Logger = log.New(buff, "[negroni] ", 0)
 
-	n := NewRouter()
+	n := mux.NewRouter()
 	// replace log for testing
 	n.UseMiddleware(l)
 	n.UseMiddlewareHandler(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
@@ -30,6 +33,6 @@ func Test_Logger(t *testing.T) {
 	}
 
 	n.ServeHTTP(recorder, req)
-	expect(t, recorder.Code, http.StatusNotFound)
-	refute(t, len(buff.String()), 0)
+	assert.Equal(t, recorder.Code, http.StatusNotFound)
+	assert.NotEqual(t, len(buff.String()), 0)
 }

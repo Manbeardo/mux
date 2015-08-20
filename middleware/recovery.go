@@ -1,6 +1,6 @@
 // lovingly stolen from negroni
 
-package mux
+package middleware
 
 import (
 	"fmt"

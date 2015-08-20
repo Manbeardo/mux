@@ -1,12 +1,14 @@
 // lovingly stolen from negroni
 
-package mux
+package middleware
 
 import (
 	"log"
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/Manbeardo/mux"
 )
 
 // Logger is a middleware handler that logs the request as it goes in and the response as it goes out.
@@ -26,6 +28,6 @@ func (l *Logger) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.Ha
 
 	next(rw, r)
 
-	res := rw.(ResponseWriter)
+	res := rw.(mux.ResponseWriter)
 	l.Printf("Completed %v %s in %v", res.Status(), http.StatusText(res.Status()), time.Since(start))
 }
